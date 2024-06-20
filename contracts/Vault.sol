@@ -1,19 +1,14 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity =0.8.24;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
-interface  WETH {
-    function mint(uint256 _amount) external;
-}
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IWETH } from "./interfaces/IWETH.sol";
 
 contract Vault {
-    IERC20 public weth;
+    address public weth;
 
     /// user deposited token amount
     mapping(address => mapping(address => uint256)) public userTokenAmount;
-    /// total deposited token amount
-    mapping(address => uint256) public totalDeposited;
 
     /// @notice Emitted when a token is deposited
     /// @param user The address of the user depositing the token
@@ -42,7 +37,7 @@ contract Vault {
      * @param _weth The address of the WETH token
      */
     constructor(address _weth) {
-        weth = IERC20(_weth);
+        weth = _weth;
     }
 
     /**
@@ -53,7 +48,7 @@ contract Vault {
      */
     function depositToken(address _tokenAddress, uint256 _amount) external payable {
         if (_tokenAddress == address(0)) {
-            require(msg.value >= _amount, "Insufficient funds");
+            require(msg.value >= _amount, "Vault: Insufficient funds");
         } else {
             IERC20(_tokenAddress).transferFrom(msg.sender, address(this), _amount);
         }
@@ -67,11 +62,11 @@ contract Vault {
      * @param _amount The amount of ETH to wrap
      */
     function wrapETH(uint256 _amount) external {
-        require(userTokenAmount[address(0)][msg.sender] >= _amount, "wrapped amount more than eth deposited");
+        require(userTokenAmount[address(0)][msg.sender] >= _amount, "Vault: wrapped amount more than eth deposited");
         userTokenAmount[address(0)][msg.sender] -= _amount;
-        userTokenAmount[address(weth)][msg.sender] += _amount;
+        userTokenAmount[weth][msg.sender] += _amount;
 
-        IERC20(weth).transfer(msg.sender, _amount);
+        IWETH(weth).mint(msg.sender, _amount);
         emit ETHWrapped(msg.sender, _amount);
     }
 
@@ -80,8 +75,8 @@ contract Vault {
      * @param _amount The amount of WETH to unwrap
      */
     function unwrapWETH(uint256 _amount) external {
-        require(userTokenAmount[address(weth)][msg.sender] >= _amount, "unwrapped amount exceed");
-        userTokenAmount[address(weth)][msg.sender] -= _amount;
+        require(userTokenAmount[address(weth)][msg.sender] >= _amount, "Vault: unwrapped amount exceed");
+        userTokenAmount[weth][msg.sender] -= _amount;
         userTokenAmount[address(0)][msg.sender] += _amount;
 
         IERC20(weth).transferFrom(msg.sender, address(this), _amount);
@@ -95,11 +90,12 @@ contract Vault {
      * @param _amount The amount of the token to withdraw
      */
     function withdrawToken(address _token, uint256 _amount) external payable {
-        require(userTokenAmount[_token][msg.sender] >= _amount, "withdraw amount exceed");
+        require(userTokenAmount[_token][msg.sender] >= _amount, "Vault: withdraw amount exceed");
         userTokenAmount[_token][msg.sender] -= _amount;
 
         if (_token == address(0)) {
-            payable(msg.sender).transfer(_amount);
+            (bool sent, ) = payable(msg.sender).call{value: _amount}("");
+            require(sent, "Failed to send Ether");
         } else {
             IERC20(_token).transfer(msg.sender, _amount);
         }
