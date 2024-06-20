@@ -47,6 +47,7 @@ contract Vault {
 
     /**
      * @notice Deposit tokens into the vault
+     * if zero address provided in tokenAddress, then eth wiil deposit
      * @param _tokenAddress The address of the token to deposit
      * @param _amount The amount of the token to deposit
      */
@@ -89,6 +90,7 @@ contract Vault {
 
     /**
      * @notice Withdraw tokens from the vault
+     * if zero address in passed in token then eth will withdraw
      * @param _token The address of the token to withdraw
      * @param _amount The amount of the token to withdraw
      */
