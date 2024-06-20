@@ -3,9 +3,8 @@ const hre = require("hardhat");
 async function main() {
 
   let wethAddress = process.env.WETH;
-  const vault = await hre.ethers.deployContract("Vault", [wethAddress], {
-    value: lockedAmount,
-  });
+  let admin = process.env.ADMIN;
+  const vault = await hre.ethers.deployContract("Vault", [wethAddress, admin]);
 
   await vault.waitForDeployment();
 
