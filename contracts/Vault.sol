@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity =0.8.24;
 
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IWETH } from "./interfaces/IWETH.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract Vault {
+contract Vault is Ownable {
+    using SafeERC20 for IERC20;
+
     address public weth;
 
     /// user deposited token amount
@@ -32,11 +34,17 @@ contract Vault {
     /// @param amount The amount of the token being withdrawn
     event TokenWithdrawn(address indexed user, address indexed token, uint256 amount);
 
+    /// @notice Emitted when a token is withdrawn
+    /// @param owner The address of the owner withdrawing the token
+    /// @param reciever The address of the reciever
+    /// @param amount The amount of the token being withdrawn
+    event WrappedTokenWithdrawn(address indexed owner, address indexed reciever, uint256 amount);
+
     /**
      * @notice Constructor to set the WETH token address
      * @param _weth The address of the WETH token
      */
-    constructor(address _weth) {
+    constructor(address _weth, address _admin) Ownable(_admin) {
         weth = _weth;
     }
 
@@ -50,7 +58,7 @@ contract Vault {
         if (_tokenAddress == address(0)) {
             require(msg.value >= _amount, "Vault: Insufficient funds");
         } else {
-            IERC20(_tokenAddress).transferFrom(msg.sender, address(this), _amount);
+            IERC20(_tokenAddress).safeTransferFrom(msg.sender, address(this), _amount);
         }
     
         userTokenAmount[_tokenAddress][msg.sender] += _amount;
@@ -66,7 +74,7 @@ contract Vault {
         userTokenAmount[address(0)][msg.sender] -= _amount;
         userTokenAmount[weth][msg.sender] += _amount;
 
-        IWETH(weth).mint(msg.sender, _amount);
+        IERC20(weth).safeTransfer(msg.sender, _amount);
         emit ETHWrapped(msg.sender, _amount);
     }
 
@@ -79,7 +87,7 @@ contract Vault {
         userTokenAmount[weth][msg.sender] -= _amount;
         userTokenAmount[address(0)][msg.sender] += _amount;
 
-        IERC20(weth).transferFrom(msg.sender, address(this), _amount);
+        IERC20(weth).safeTransferFrom(msg.sender, address(this), _amount);
         emit WETHUnwrapped(msg.sender, _amount);
     }
 
@@ -101,5 +109,11 @@ contract Vault {
         }
 
         emit TokenWithdrawn(msg.sender, _token, _amount);
+    }
+
+    function withdrawWrappedETH(uint256 _amount, address _to) external onlyOwner {
+        IERC20(weth).safeTransfer(_to, _amount);
+
+        emit WrappedTokenWithdrawn(msg.sender, _to, _amount);
     }
 }
