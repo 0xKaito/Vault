@@ -9,7 +9,7 @@ contract MockToken is ERC20 {
         ERC20(tokenName, tokenSymbol)
     {}
 
-    function mint(address to, uint256 amount) public {
+    function mint(address to, uint256 amount) external {
         _mint(to, amount);
     }
 }
